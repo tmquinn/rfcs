@@ -9,9 +9,13 @@
 This RFC introduces the concept of tracked properties. Tracked properties are just like normal properties but are the mechanism for opting into change detection. Tracked properties are exposed by Ember as decorators.
 
 ## Background
-This RFC requires us to frontload how change tracking works inside of Ember.
+Historically, Ember has used `get` and `set` for accessing and setting properties on a class. This was largely due to the fact that Ember's browser matrix included browsers where accessors were not available. As of Ember 3.0, this is no longer the case.
 
-Historically, Ember has used a notification-based system under the hood to perform change detection within an application. Effectively, this means that the system has push-based semantics since we "push" out notifications to subscribers to keep values up to date. To illustrate how this works in practice, Lets consider the following example.
+[RFC#281](https://github.com/emberjs/rfcs/blob/master/text/0281-es5-getters.md) made it possible for applications to use JS `PathExpression`s for accessing properties by installing ES5 getters. This is now available in Ember 3.1. While we loosened the constraint on `get`, RFC#281 did not attempt to loosen the requirement of `set`. This is largely because `set` is the entry point into the change tracking system.
+
+### Notification-based Change Detection
+
+Since the beginning, Ember has used a notification-based system under the hood to perform change detection within an application. Effectively, this means that the system has push-based semantics since we "push" out notifications to subscribers to keep values up to date. To illustrate how this works in practice, Lets consider the following example.
 
 ```js
 import Component from '@ember/component';
@@ -38,9 +42,9 @@ export Component.extend({
 });
 ```
 
-In the example above we have a computed property which concats `firstName` and `lastName`. When the `updateFirstName` and/or `updateLastName` actions are called we call `set`. Calling `set` on the properties will set the value on the instance and then notify any dependents to invalidate. This means that the computed property will be invalidated and its value will be recomputed the next time it is accessed.
+In the example above we have a computed property which concats `firstName` and `lastName`. When the `updateFirstName` and/or `updateLastName` actions are called we call `set`. Calling `set` on the properties will set the value on the instance and then notify any dependents to invalidate. This means that the computed property will be invalidated and its value will be recomputed the next time it is accessed. While this system works, notifications are eager by nature and can lead to excessive churn. Furthermore, notification based systems typically lead to more memory consumption.
 
-### References
+### Pull-based Change Detection
 
 With the introduction of the Glimmer VM we also introduced a new change tracking system known as [references](https://github.com/glimmerjs/glimmer-vm/blob/master/guides/04-references.md). References are the underlying data structure that back `MustacheStatement`s in a template and keep the UI up to date. Unlike notification-based system that backs APIs like `Computed` and `Observable`, references have pull-based semantics. This means that instead of having subcribers and notifiers, we must have a descrete signal to "capture" the underlying values. This can be best illustrated by the following example:
 
@@ -85,15 +89,13 @@ While references allow us to model arbitrarily complex computation, they require
 
 The revision tag system is based around the idea of a global revision counter. The global revision counter is a monotonically increasing sequence, which is just a fancy way of saying that it's a global number that only increases but never decreases.
 
-Conceptually, a discrete system (which is what Glimmer assumes) can be modeled as a series of state transitions. The global revision counter is incremented by one every time the system undergoes a state transition. In other words, the global revision counter is incremented every time a variable is changed in the system.
-
-In practice, we are only concerned with a subset of all state changes that are observable from the perspective of the templating system. For example, when a variable that is not part of any template is modified, it is not particularly important that the global revision counter is incremented.
+Conceptually, a discrete system can be modeled as a series of state transitions. The global revision counter is incremented by one every time the system undergoes a state transition. In other words, the global revision counter is incremented every time a variable is changed in the system.
 
 In addition to the global counter, each (observable) object in the system has an internal "last modified" revision counter. Every time an object is modified, this counter will be set to the current value of the global revision counter (after the global revision counter has been incremented).
 
-The easiest way to implement this is with a collaborating object model. For example, all observable changes in Ember are already required to go through the `Ember.set` function. This is a perfect opportunity to increment both the global and per-object revision counters.
+The easiest way to implement this is with a collaborating object model. For example, all observable changes in Ember are already required to go through the `set` function. This is a perfect opportunity to increment both the global and per-object revision counters.
 
-These primitives lay out the foundation for the revision tag system. If we can assume each observable object in the system has a `lastModified` counter, then it would be possible to construct an entity tag for each object where the validation ticket is the current value of the `lastModified` counter. This tag will guarantee the freshness of any first-level path lookups on that object. In other words, all property lookups on an object will have the same result so long as the `lastModified` remain unchanged.
+These primitives lay out the foundation for the revision tag system. If we can assume each observable object in the system has a `lastModified` counter, then it would be possible to construct an entity tag for each object where the validation ticket is the current value of the `lastModified` counter. This tag will guarantee the freshness of any first-level path lookups on that object. In other words, all property lookups on an object will have the same result so long as the `lastModified` remains unchanged.
 
 ```js
 let $REVISION_COUNTER = 1;
@@ -123,7 +125,7 @@ function set(object, property, value) {
 
 ///
 
-let person: TrackedObject = {
+let person = {
   tag: new DirtyableTag(),
   name: 'Godfrey Chan'
 };
@@ -135,6 +137,9 @@ set(person, 'name', 'Yehuda Katz');
 person.tag.validate(1); // => false
 person.tag.value(); // => 2
 ```
+
+## Motivation
+Due to the flexibility of the references, we have been able seamlessly model the semantics of the notification-based system in terms of the pull-based system. While it was a goal to ensure backwards compatability, references can actually be used to help simplify the programming model and introduce a path to remove `set`.
 
 ## Detailed design
 
