@@ -57,7 +57,9 @@ This is typically refered to as the "mandatory setter" error. While it is possib
 
 Since the `@tracked` encapsulates the change tracking details within the installed property descriptor, we are able to drop `set` for assigning and just javascript assignment.
 
-### Remove Need For Dependent Keys
+### Remove The Need For Dependent Keys
+
+Computed properties are great for taking one or more normal properties and transforming or manipulating their data to create a new value. While they have been foundational to Ember's programming model, they were initially created to fill the void of property accessors in the javascript language. Since ES5 introduced assessor methods, we can re-exam if we can simplify this concept.
 
 ## Detailed design
 
