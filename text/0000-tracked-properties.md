@@ -8,7 +8,101 @@
 
 This RFC introduces the concept of tracked properties. Tracked properties are just like normal properties but are the mechanism for opting into change detection. Tracked properties are exposed by Ember as decorators.
 
-## Background
+As an example this is what that would look like.
+
+```js
+import { tracked } from '@ember/object';
+
+export default class Example {
+  @tracked firstName;
+  @tracked lastName;
+
+  @tracked
+  get fullName() {
+    return `${this.firstName} ${this.lastName}`;
+  }
+
+  set fullName(fullName) {
+    let [ first, last ] = fullName.split(' ');
+    this.firstName = first;
+    this.lastName = last;
+  }
+
+  changeFirstName(firstName) {
+    this.firstName = firstName;
+  }
+
+  changeLastName(lastName) {
+    this.lastName = lastName;
+  }
+}
+```
+
+If you are not familar with how change tracking has evolved in Ember please see the appendix.
+
+## Motivation
+Due to the flexibility of the reference system introduce by the Glimmer VM, we have been able seamlessly model the semantics of the notification-based change tracking system in terms of the pull-based change tracking system. While it was a goal to ensure backwards compatability, references can actually be used to help simplify the programming model. Below are some areas of oppurtunity.
+
+### Opt-in Mutations
+
+Today, any value that this referenced in the templating layer is automatically opted into observing changes. If you attempt to mutate those properties without `set` you will get an error like the following:
+
+```
+You must use set() to set the `someProp` property (of custom-object) to `foo-bar`.
+```
+
+This is typically refered to as the "mandatory setter" error. While it is possible to set values using normal javascript assignment, it is considered a best practice to always use `set` since it is not immediately obvious as to what properties are being observed or not. With tracked properties, only changes to properties that have been annotated with the `@tracked` decorator will be observable through out the system.
+
+### Remove `set`
+
+Since the `@tracked` encapsulates the change tracking details within the installed property descriptor, we are able to drop `set` for assigning and just javascript assignment.
+
+### Remove Need For Dependent Keys
+
+## Detailed design
+
+> This is the bulk of the RFC.
+
+> Explain the design in enough detail for somebody
+familiar with the framework to understand, and for somebody familiar with the
+implementation to implement. This should get into specifics and corner-cases,
+and include examples of how the feature is used. Any new terminology should be
+defined here.
+
+## How we teach this
+
+> What names and terminology work best for these concepts and why? How is this
+idea best presented? As a continuation of existing Ember patterns, or as a
+wholly new one?
+
+> Would the acceptance of this proposal mean the Ember guides must be
+re-organized or altered? Does it change how Ember is taught to new users
+at any level?
+
+> How should this feature be introduced and taught to existing Ember
+users?
+
+## Drawbacks
+
+> Why should we *not* do this? Please consider the impact on teaching Ember,
+on the integration of this feature with other existing and planned features,
+on the impact of the API churn on existing apps, etc.
+
+> There are tradeoffs to choosing any path, please attempt to identify them here.
+
+## Alternatives
+
+> What other designs have been considered? What is the impact of not doing this?
+
+> This section could also include prior art, that is, how other frameworks in the same domain have solved this problem.
+
+## Unresolved questions
+
+> Optional, but suggested for first drafts. What parts of the design are still
+TBD?
+
+## Appendix
+
 Historically, Ember has used `get` and `set` for accessing and setting properties on a class. This was largely due to the fact that Ember's browser matrix included browsers where accessors were not available. As of Ember 3.0, this is no longer the case.
 
 [RFC#281](https://github.com/emberjs/rfcs/blob/master/text/0281-es5-getters.md) made it possible for applications to use JS `PathExpression`s for accessing properties by installing ES5 getters. This is now available in Ember 3.1. While we loosened the constraint on `get`, RFC#281 did not attempt to loosen the requirement of `set`. This is largely because `set` is the entry point into the change tracking system.
@@ -137,48 +231,3 @@ set(person, 'name', 'Yehuda Katz');
 person.tag.validate(1); // => false
 person.tag.value(); // => 2
 ```
-
-## Motivation
-Due to the flexibility of the references, we have been able seamlessly model the semantics of the notification-based system in terms of the pull-based system. While it was a goal to ensure backwards compatability, references can actually be used to help simplify the programming model and introduce a path to remove `set`.
-
-## Detailed design
-
-> This is the bulk of the RFC.
-
-> Explain the design in enough detail for somebody
-familiar with the framework to understand, and for somebody familiar with the
-implementation to implement. This should get into specifics and corner-cases,
-and include examples of how the feature is used. Any new terminology should be
-defined here.
-
-## How we teach this
-
-> What names and terminology work best for these concepts and why? How is this
-idea best presented? As a continuation of existing Ember patterns, or as a
-wholly new one?
-
-> Would the acceptance of this proposal mean the Ember guides must be
-re-organized or altered? Does it change how Ember is taught to new users
-at any level?
-
-> How should this feature be introduced and taught to existing Ember
-users?
-
-## Drawbacks
-
-> Why should we *not* do this? Please consider the impact on teaching Ember,
-on the integration of this feature with other existing and planned features,
-on the impact of the API churn on existing apps, etc.
-
-> There are tradeoffs to choosing any path, please attempt to identify them here.
-
-## Alternatives
-
-> What other designs have been considered? What is the impact of not doing this?
-
-> This section could also include prior art, that is, how other frameworks in the same domain have solved this problem.
-
-## Unresolved questions
-
-> Optional, but suggested for first drafts. What parts of the design are still
-TBD?
