@@ -61,6 +61,8 @@ Since the `@tracked` encapsulates the change tracking details within the install
 
 Computed properties are great for taking one or more normal properties and transforming or manipulating their data to create a new value. While they have been foundational to Ember's programming model, they were initially created to fill the void of property accessors in the javascript language. Since ES5 introduced assessor methods, we can re-exam if we can simplify this concept.
 
+Computed properties require that you enumerate the properties that it depends on. These are typically refered to as dependent keys (DKs) and are used to understand the freshness of the computed property. Whenever any of the DKs are updated we know that we need to recompute the computed property the next time it is accessed.
+
 ## Detailed design
 
 > This is the bulk of the RFC.
